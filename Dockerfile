@@ -1,7 +1,8 @@
-# instruction
+#usage:
 # 1) build: sudo docker build -t ml . | tee dkr.log
 # 2) run: sudo docker run -it ml
 # 3) connect to the running one: sudo exec -it ml bash
+
 FROM ubuntu:xenial
 
 
