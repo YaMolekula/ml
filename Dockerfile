@@ -1,7 +1,8 @@
-#usage:
-# 1) build: sudo docker build -t ml . | tee dkr.log
-# 2) run: sudo docker run -it ml
-# 3) connect to the running one: sudo exec -it ml bash
+#commands:
+# sudo docker build -t ml . | tee dkr.log
+# sudo docker run -it -v <outer path>:<inner path> -p <outer port>:<inner port> ml
+# sudo exec -it ml bash
+
 
 FROM ubuntu:xenial
 
@@ -48,32 +49,36 @@ RUN sudo apt-get update
 RUN sudo apt-get install -y software-properties-common
 RUN sudo apt-get install -y apt-transport-https
 
-RUN gpg --keyserver ha.pool.sks-keyservers.net --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4
 
 
 ######################## Anaconda ####################################
+
+ENV CONDA /opt/conda
+
 RUN \
-#  wget --quiet https://repo.continuum.io/archive/Anaconda2-5.0.1-Linux-x86_64.sh -O ~/anaconda.sh \
-  sudo wget --quiet https://repo.continuum.io/archive/Anaconda3-5.0.1-Linux-x86_64.sh -O ~/anaconda.sh \
-  && sudo /bin/bash ~/anaconda.sh -b -p /opt/conda \
+# wget --quiet https://repo.continuum.io/archive/Anaconda2-5.0.1-Linux-x86_64.sh -O ~/anaconda.sh \
+# wget --quiet https://repo.continuum.io/archive/Anaconda3-5.0.1-Linux-x86_64.sh -O ~/anaconda.sh \
+  wget --quiet https://repo.continuum.io/archive/Anaconda3-4.1.1-Linux-x86_64.sh -O ~/anaconda.sh \
+  && sudo /bin/bash ~/anaconda.sh -b -p $CONDA \
   && sudo rm ~/anaconda.sh
 
 RUN \
-  sudo /opt/conda/bin/conda install -c conda-forge tensorflow &&\
-  sudo /opt/conda/bin/conda install -c conda-forge xgboost &&\
-  sudo /opt/conda/bin/conda install -c conda-forge lightgbm &&\
-  sudo /opt/conda/bin/conda install -c anaconda setuptools &&\
-  sudo /opt/conda/bin/pip install deap &&\
-  sudo /opt/conda/bin/pip install catboost &&\
-  sudo /opt/conda/bin/pip install kaggle-cli &&\
-  sudo /opt/conda/bin/pip install \
+  sudo -E $CONDA/bin/conda install -c conda-forge tensorflow &&\
+  sudo -E $CONDA/bin/conda install -c conda-forge xgboost &&\
+  sudo -E $CONDA/bin/conda install -c conda-forge lightgbm &&\
+  sudo -E $CONDA/bin/conda install -c anaconda setuptools &&\
+  sudo -E $CONDA/bin/conda install -c conda-forge ipdb &&\
+  sudo -E $CONDA/bin/pip install deap &&\
+  sudo -E $CONDA/bin/pip install catboost &&\
+  sudo -E $CONDA/bin/pip install kaggle-cli &&\
+  sudo -E $CONDA/bin/pip install \
     virtualenv virtualenvwrapper \
-    jedi flake8
+    jedi flake8 
   
 
 ####################### r-language #####################
-RUN sudo add-apt-repository -y ppa:webupd8team/java
-RUN sudo apt-get update
+#RUN sudo add-apt-repository -y ppa:webupd8team/java
+#RUN sudo apt-get update
  
 RUN sudo add-apt-repository 'deb https://ftp.ussg.iu.edu/CRAN/bin/linux/ubuntu xenial/'
 RUN sudo apt-get update
@@ -92,27 +97,31 @@ RUN sudo rm rstudio-1.0.44-amd64.deb
 #  && cd /home/dev/ESS && make && make install
 
 
-##################### work with go ####################
-RUN mkdir /home/dev/go && mkdir /home/dev/go/bin
-ENV GOPATH /home/dev/go
+#################### go and go-based utilities ####################
+
+ENV GOPATH /gopath
+
+# go environment
+RUN sudo -E mkdir $GOPATH && sudo -E mkdir $GOPATH/bin \
+  && sudo -E chown -R dev $GOPATH
 ENV PATH $PATH:$GOPATH/bin
 RUN go get -u github.com/nsf/gocode
 
-
-######################### gcsfuse ######################
-# For mounting Google Compute Storage buckets as directories
-# sudo gcsfuse --key-file <path-to-key> <bucket-name> <local-path>
-ENV GCSFUSE_REPO gcsfuse-xenial
-RUN sudo -E echo "deb http://packages.cloud.google.com/apt $GCSFUSE_REPO main" | sudo tee /etc/apt/sources.list.d/gcsfuse.list
-RUN sudo -E cat /etc/apt/sources.list.d/gcsfuse.list
-RUN sudo -E curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
-RUN sudo -E apt-get update
-RUN sudo -E apt-get install -y gcsfuse
-
-
-######################### gdrive ########################
+# gdrive
 # work with Google Drive from cli
 RUN go get github.com/prasmussen/gdrive
+
+
+########################## gcsfuse ##############################
+# For mounting Google Compute Storage buckets as directories
+# sudo gcsfuse --key-file <path-to-key> <bucket-name> <local-path>
+RUN \
+  sudo bash -c 'echo "deb http://packages.cloud.google.com/apt cloud-sdk-xenial main" >> /etc/apt/sources.list.d/google-cloud.sdk.list' \
+  && sudo bash -c 'echo "deb http://packages.cloud.google.com/apt gcsfuse-xenial main" >> /etc/apt/sources.list.d/gcsfuse.list' \
+  && sudo wget -qO- https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add - \
+  && sudo apt-get update && sudo apt-get install -y --no-install-recommends google-cloud-sdk gcsfuse \
+  && sudo rm -rf /var/lib/apt/lists
+
 
 
 ####################### vim plugins ######################
@@ -127,24 +136,31 @@ RUN sudo -E vim +PluginInstall +qall
 
 # Install YouCompleteMe - autocomplete for python(static),c++ ()
 # Reference https://github.com/Valloric/YouCompleteMe#ubuntu-linux-x64
-RUN sudo /opt/conda/bin/python /usr/share/vim/bundle/YouCompleteMe/install.py --clang-completer --gocode-completer
+RUN sudo /opt/conda/bin/python /usr/share/vim/bundle/YouCompleteMe/install.py --clang-completer --system-libclang --gocode-completer
+COPY inst.d/.ycm_extra_conf_custom.py /usr/share/vim/bundle/YouCompleteMe/third_party/ycmd/cpp/ycm/.ycm_extra_conf_custom.py
+
 #######################################################################
 
 
 # environment variables
 RUN \
-  sudo bash -c 'echo "export GOPATH=/home/dev/go" >> /etc/bash.basrc' &&\
-  sudo bash -c 'echo "PATH=/opt/conda/bin:$GOPATH/bin:$PATH" >> /etc/bash.bashrc' 
+  sudo bash -c "echo \"export GOPATH=$GOPATH\" >> /etc/bash.basrc" &&\
+  sudo bash -c "echo \"PATH=$CONDA/bin:$GOPATH/bin:$PATH\" >> /etc/bash.bashrc" 
 
 
 # emacs configuration
-#COPY ./inst.d/init.el /root/.emacs.d/init.el
-#COPY ./inst.d/init.el /home/dev/.emacs.d/init.el
+COPY ./inst.d/init.el /root/.emacs.d/init.el
+COPY ./inst.d/init.el /home/dev/.emacs.d/init.el
 
+
+RUN \
+  /opt/conda/bin/jupyter notebook --generate-config \
+  && sudo bash -c "echo \"c.NotebookApp.ip = '*'\" >> /home/dev/.jupyter/jupyter_notebook_config.py" \
+  && sudo bash -c "echo \"c.NotebookApp.port = 8888\" >> /home/dev/.jupyter/jupyter_notebook_config.py"
+#COPY auth/jupyter_notebook_config.json /home/dev/.jupyter/jupyter_notebook_config.json
 
 # privilegies for dev
 RUN \
-  sudo chown -R dev /etc/vim /home/dev \
-  && sudo chgrp -R dev /etc/vim /home/dev 
-
+  sudo chown -R dev /etc/vim $HOME \
+  && sudo chgrp -R dev /etc/vim $HOME 
 
