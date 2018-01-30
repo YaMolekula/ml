@@ -64,6 +64,8 @@ RUN \
 
 RUN \
   sudo -E $CONDA/bin/conda install -c conda-forge tensorflow &&\
+  sudo -E $CONDA/bin/conda install -c conda-forge keras &&\
+  sudo -E $CONDA/bin/conda install -c soumith pytorch &&\
   sudo -E $CONDA/bin/conda install -c conda-forge xgboost &&\
   sudo -E $CONDA/bin/conda install -c conda-forge lightgbm &&\
   sudo -E $CONDA/bin/conda install -c anaconda setuptools &&\
