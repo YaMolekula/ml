@@ -78,6 +78,23 @@ RUN \
     jedi flake8 
   
 
+######################   nltk   #######################
+RUN python3 -m nltk.downloader -d /usr/share/nltk_data brown
+RUN python3 -m nltk.downloader -d /usr/share/nltk_data punkt
+
+RUN python3 -m nltk.downloader -d /usr/share/nltk_data treebank
+RUN python3 -m nltk.downloader -d /usr/share/nltk_data sinica_treebank
+
+RUN python3 -m nltk.downloader -d /usr/share/nltk_data hmm_treebank_pos_tagger
+RUN python3 -m nltk.downloader -d /usr/share/nltk_data maxent_treebank_pos_tagger
+
+RUN python3 -m nltk.downloader -d /usr/share/nltk_data words
+RUN python3 -m nltk.downloader -d /usr/share/nltk_data stopwords
+RUN python3 -m nltk.downloader -d /usr/share/nltk_data names
+
+RUN python3 -m nltk.downloader -d /usr/share/nltk_data wordnet
+
+
 ####################### r-language #####################
 #RUN sudo add-apt-repository -y ppa:webupd8team/java
 #RUN sudo apt-get update
